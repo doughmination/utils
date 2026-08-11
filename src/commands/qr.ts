@@ -55,11 +55,6 @@ export const command = {
                 .setFooter({ text: `${size}×${size}px` })
                 .setTimestamp();
 
-            // Show the encoded content inline only when it's short enough to be useful.
-            if (text.length <= 200) {
-                embed.setDescription(`\`\`\`\n${text}\n\`\`\``);
-            }
-
             await interaction.editReply({ embeds: [embed], files: [attachment] });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error occurred';
