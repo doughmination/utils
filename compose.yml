@@ -1,5 +1,6 @@
 services:
   bot:
+    user: 1000:1002
     build: .
     container_name: clove-bot
     restart: unless-stopped
