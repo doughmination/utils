@@ -1,21 +1,18 @@
-FROM node:25-alpine
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# Copy manifest + lockfile first for cached installs
+COPY package.json bun.lock ./
 
-# Install dependencies AND dotenvx globally
-RUN npm i && npm install -g @dotenvx/dotenvx
+# Install dependencies (frozen to the lockfile) AND dotenvx globally
+RUN bun install --frozen-lockfile && bun install -g @dotenvx/dotenvx
 
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
-
 # Make start script executable
 RUN chmod +x start.sh
 
-# Deploy commands and run the bot
+# Deploy commands and run the bot (TypeScript runs directly under bun)
 CMD ["sh", "start.sh"]

@@ -1,6 +1,9 @@
 import { Events, Interaction, AutocompleteInteraction } from 'discord.js';
 import { loadCommands } from '../handlers/commandHandler';
 import { doughAPI } from '../utils/doughAPI';
+import { genshinAPI } from '../utils/genshinAPI';
+import { GENSHIN_ACCOUNTS } from '../config/genshin';
+import { ACCOUNT_BY_SUBCOMMAND } from '../utils/genshinCharacter';
 import { isAuthorized, sendUnauthorizedResponse } from '../middleware/authorization';
 
 export const name = Events.InteractionCreate;
@@ -111,6 +114,43 @@ async function handleAutocomplete(interaction: AutocompleteInteraction) {
                 console.error('Error in autocomplete:', error);
                 await interaction.respond([]);
             }
+        }
+    }
+
+    // Handle genshin character autocomplete. The subcommand (main-chara /
+    // alt-chara) determines which account's roster to search — the two
+    // accounts hold different characters.
+    if (commandName === 'genshin' && focusedOption.name === 'name') {
+        const subcommand = interaction.options.getSubcommand(false) || '';
+        const accountKey = ACCOUNT_BY_SUBCOMMAND[subcommand];
+        if (!accountKey) {
+            await interaction.respond([]);
+            return;
+        }
+
+        try {
+            const account = GENSHIN_ACCOUNTS[accountKey];
+            const roster = await genshinAPI.getRoster(account.uid);
+
+            const searchQuery = focusedOption.value.toLowerCase();
+            // Owned first (sorted by level), then the rest of the catalog, so
+            // owned characters surface but nothing is hidden.
+            const filtered = roster.characters
+                .filter(c => c.name.toLowerCase().includes(searchQuery))
+                .sort((a, b) => {
+                    if (a.owned !== b.owned) return a.owned ? -1 : 1;
+                    return (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name);
+                })
+                .slice(0, 25) // Discord limits to 25 autocomplete options
+                .map(c => ({
+                    name: c.owned && c.level != null ? `${c.name} (Lv.${c.level})` : c.name,
+                    value: c.name,
+                }));
+
+            await interaction.respond(filtered);
+        } catch (error) {
+            console.error('Error in genshin autocomplete:', error);
+            await interaction.respond([]);
         }
     }
 }

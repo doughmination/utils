@@ -11,7 +11,7 @@ class DoughAPIClient {
 
     constructor() {
         this.token = process.env.DOUGH_API_TOKEN || '';
-        this.baseURL = 'https://system.doughmination.co.uk';
+        this.baseURL = 'https://doughmination.uk/v2/plural';
 
         if (!this.token) {
             console.error('WARNING: DOUGH_API_TOKEN not set in .env file!');
@@ -33,7 +33,7 @@ class DoughAPIClient {
      */
     async healthCheck(): Promise<{ status: string; authenticated: boolean }> {
         try {
-            const response = await this.client.get('/api/bot/health');
+            const response = await this.client.get('/bot/health');
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -48,7 +48,7 @@ class DoughAPIClient {
      */
     async getSystemInfo(): Promise<any> {
         try {
-            const response = await this.client.get('/api/bot/system/info');
+            const response = await this.client.get('/bot/system/info');
             return response.data.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -63,7 +63,7 @@ class DoughAPIClient {
      */
     async getMembers(): Promise<any[]> {
         try {
-            const response = await this.client.get('/api/bot/members');
+            const response = await this.client.get('/bot/members');
             return response.data.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -78,7 +78,7 @@ class DoughAPIClient {
      */
     async getFronters(): Promise<any> {
         try {
-            const response = await this.client.get('/api/bot/fronters');
+            const response = await this.client.get('/bot/fronters');
             return response.data.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -94,68 +94,13 @@ class DoughAPIClient {
      */
     async multiSwitch(memberIds: string[]): Promise<{ status: string; message: string; fronters: any[]; count: number }> {
         try {
-            const response = await this.client.post('/api/bot/switch', {
+            const response = await this.client.post('/bot/switch', {
                 member_ids: memberIds
             });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 throw new Error(`Failed to switch fronters: ${error.response?.data?.detail || error.message}`);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * DEPRECATED: Add a member to the front
-     * Use multiSwitch instead for better consistency
-     * @deprecated Use multiSwitch() instead
-     */
-    async addFronter(memberId: string): Promise<{ success: boolean; message: string; fronters: any[] }> {
-        console.warn('addFronter() is deprecated. Use multiSwitch() instead.');
-        try {
-            const response = await this.client.post('/api/bot/fronters/add', {
-                member_id: memberId
-            });
-            return response.data;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                throw new Error(`Failed to add fronter: ${error.response?.data?.detail || error.message}`);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * DEPRECATED: Remove a member from the front
-     * Use multiSwitch instead for better consistency
-     * @deprecated Use multiSwitch() instead
-     */
-    async removeFronter(memberId: string): Promise<{ success: boolean; message: string; fronters: any[] }> {
-        console.warn('removeFronter() is deprecated. Use multiSwitch() instead.');
-        try {
-            const response = await this.client.post('/api/bot/fronters/remove', {
-                member_id: memberId
-            });
-            return response.data;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                throw new Error(`Failed to remove fronter: ${error.response?.data?.detail || error.message}`);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Regenerate the bot access token (self-regeneration)
-     */
-    async regenerateToken(): Promise<{ success: boolean; message: string; new_token: string }> {
-        try {
-            const response = await this.client.post('/api/bot/token/regenerate-self');
-            return response.data;
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                throw new Error(`Failed to regenerate token: ${error.response?.data?.detail || error.message}`);
             }
             throw error;
         }

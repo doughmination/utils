@@ -1,26 +1,25 @@
 {
   "name": "discord-bot",
   "version": "1.0.0",
-  "description": "Discord bot with TypeScript",
-  "main": "dist/main.js",
+  "description": "Discord bot with TypeScript, running on Bun",
+  "main": "src/main.ts",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js",
-    "dev": "ts-node src/main.ts",
-    "deploy": "ts-node src/deploy-commands.ts",
-    "deploy:prod": "node dist/deploy-commands.js"
+    "start": "dotenvx run -- bun run src/main.ts",
+    "dev": "dotenvx run -- bun --watch run src/main.ts",
+    "deploy": "dotenvx run -- bun run src/deploy-commands.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "CloveTwilight3",
   "license": "MIT",
   "dependencies": {
-    "@dotenvx/dotenvx": "^1.51.4",
-    "axios": "^1.13.2",
-    "discord.js": "^14.14.1"
+    "@dotenvx/dotenvx": "^2.21.0",
+    "axios": "^1.19.0",
+    "discord.js": "^14.27.0"
   },
   "devDependencies": {
-    "@types/node": "^25.0.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "@types/bun": "^1.3.0",
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
   }
 }

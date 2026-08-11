@@ -29,7 +29,6 @@ const OWNER_ONLY_COMMANDS: string[] = [
 const OWNER_ONLY_SUBCOMMANDS = [
     'dough:add',      // Only owner can add fronters
     'dough:remove',   // Only owner can remove fronters
-    'dough:lockout',  // Only owner can regenerate token
     'dough:health',   // Only owner can check API health
 ];
 
