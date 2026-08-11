@@ -133,17 +133,13 @@ async function handleAutocomplete(interaction: AutocompleteInteraction) {
             const roster = await genshinAPI.getRoster(account.uid);
 
             const searchQuery = focusedOption.value.toLowerCase();
-            // Owned first (sorted by level), then the rest of the catalog, so
-            // owned characters surface but nothing is hidden.
+            // Only characters owned on this account, highest level first.
             const filtered = roster.characters
-                .filter(c => c.name.toLowerCase().includes(searchQuery))
-                .sort((a, b) => {
-                    if (a.owned !== b.owned) return a.owned ? -1 : 1;
-                    return (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name);
-                })
+                .filter(c => c.owned && c.name.toLowerCase().includes(searchQuery))
+                .sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name))
                 .slice(0, 25) // Discord limits to 25 autocomplete options
                 .map(c => ({
-                    name: c.owned && c.level != null ? `${c.name} (Lv.${c.level})` : c.name,
+                    name: c.level != null ? `${c.name} (Lv.${c.level})` : c.name,
                     value: c.name,
                 }));
 
