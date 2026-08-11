@@ -34,10 +34,21 @@ export function makeCharacterCommand(subName: string, accountKey: GenshinAccount
                     .setDescription('Character name')
                     .setRequired(true)
                     .setAutocomplete(true)
+            )
+            .addBooleanOption(option =>
+                option
+                    .setName('ephemeral')
+                    .setDescription('Only show the reply to you (default: true)')
+                    .setRequired(false)
             ),
 
         async execute(interaction: ChatInputCommandInteraction) {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            // Default to ephemeral unless the user explicitly opts out
+            const isEphemeral = interaction.options.getBoolean('ephemeral') ?? false;
+
+            await interaction.deferReply({
+                flags: isEphemeral ? MessageFlags.Ephemeral : undefined,
+            });
 
             const query = interaction.options.getString('name', true);
 
