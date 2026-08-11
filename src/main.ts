@@ -15,7 +15,7 @@ loadEvents(client).then(() => {
 });
 
 // Start the front poller once the bot is ready
-client.once('ready', () => {
+client.once('clientReady', () => {
     startFrontPoller(client);
 });
 
