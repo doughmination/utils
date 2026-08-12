@@ -2,9 +2,14 @@ import { Interaction, EmbedBuilder } from 'discord.js';
 
 /**
  * Authorization levels for the bot
- * 
+ *
+ * Commands are PUBLIC by default — anyone can use them. Only the commands
+ * listed in RESTRICTED_COMMANDS below need an auth level, and within those a
+ * subcommand can be narrowed further to owner-only.
+ *
  * OWNER: Full access to all commands including sensitive operations
- * FRIEND: Access to non-sensitive commands only
+ * FRIEND: Access to restricted commands, minus owner-only subcommands
+ * PUBLIC: Everything that isn't restricted
  */
 
 /** Owner - Full access (you) */
@@ -15,12 +20,17 @@ if (!OWNER_ID || OWNER_ID === 'bot_owner_id') {
 }
 
 
-/** Friends - Limited access (non-sensitive commands only) */
+/** Friends - Access to restricted commands, minus owner-only subcommands */
 const FRIEND_IDS = process.env.FRIEND_IDS
-  ? process.env.FRIEND_IDS.split(',').map(id => id.trim())
+  ? process.env.FRIEND_IDS.split(',').map(id => id.trim()).filter(id => id.length > 0)
   : [];
 
-/** Commands that require owner-level access */
+/** Commands that are NOT public — friends and the owner only */
+const RESTRICTED_COMMANDS: string[] = [
+    'dough',
+];
+
+/** Commands that require owner-level access (entire command) */
 const OWNER_ONLY_COMMANDS: string[] = [
     // No longer blocking entire 'dough' command
 ];
@@ -32,13 +42,8 @@ const OWNER_ONLY_SUBCOMMANDS = [
     'dough:health',   // Only owner can check API health
 ];
 
-/** Subcommands that friends CAN use (format: "command:subcommand") */
-const FRIEND_ALLOWED_SUBCOMMANDS = [
-    'dough:check',    // Friends can check who's fronting
-];
-
 export enum AuthLevel {
-    UNAUTHORIZED = 0,
+    PUBLIC = 0,
     FRIEND = 1,
     OWNER = 2
 }
@@ -53,7 +58,19 @@ export function getAuthLevel(userId: string): AuthLevel {
     if (FRIEND_IDS.includes(userId)) {
         return AuthLevel.FRIEND;
     }
-    return AuthLevel.UNAUTHORIZED;
+    return AuthLevel.PUBLIC;
+}
+
+/**
+ * Is this command (or subcommand) restricted to friends and the owner?
+ */
+function isRestricted(commandName: string, subcommandName?: string): boolean {
+    if (RESTRICTED_COMMANDS.includes(commandName) || OWNER_ONLY_COMMANDS.includes(commandName)) {
+        return true;
+    }
+    return subcommandName
+        ? OWNER_ONLY_SUBCOMMANDS.includes(`${commandName}:${subcommandName}`)
+        : false;
 }
 
 /**
@@ -64,53 +81,33 @@ export function isAuthorizedForCommand(
     commandName: string,
     subcommandName?: string
 ): boolean {
-    const authLevel = getAuthLevel(userId);
-
-    // Unauthorized users can't use anything
-    if (authLevel === AuthLevel.UNAUTHORIZED) {
-        return false;
+    // Public by default — only restricted commands need an auth check.
+    if (!isRestricted(commandName, subcommandName)) {
+        return true;
     }
+
+    const authLevel = getAuthLevel(userId);
 
     // Owner can use everything
     if (authLevel === AuthLevel.OWNER) {
         return true;
     }
 
-    // For friends, check subcommand-level permissions
     if (authLevel === AuthLevel.FRIEND) {
-        // Check if the entire command is owner-only
+        // Whole-command owner locks beat friend access
         if (OWNER_ONLY_COMMANDS.includes(commandName)) {
             return false;
         }
 
-        // If there's a subcommand, check subcommand-level permissions
-        if (subcommandName) {
-            const fullSubcommandName = `${commandName}:${subcommandName}`;
-
-            // If it's explicitly owner-only, deny
-            if (OWNER_ONLY_SUBCOMMANDS.includes(fullSubcommandName)) {
-                return false;
-            }
-
-            // If it's explicitly allowed for friends, allow
-            if (FRIEND_ALLOWED_SUBCOMMANDS.includes(fullSubcommandName)) {
-                return true;
-            }
-
-            // If it's part of a command with owner-only subcommands but not explicitly allowed, deny
-            // This is a safelist approach - friends can only use what's explicitly allowed
-            const hasOwnerOnlySubcommands = OWNER_ONLY_SUBCOMMANDS.some(
-                sub => sub.startsWith(`${commandName}:`)
-            );
-            if (hasOwnerOnlySubcommands) {
-                return false;
-            }
+        if (subcommandName && OWNER_ONLY_SUBCOMMANDS.includes(`${commandName}:${subcommandName}`)) {
+            return false;
         }
 
-        // Friends can use everything else
+        // Friends get the rest of the restricted command
         return true;
     }
 
+    // Everyone else: restricted means no
     return false;
 }
 
@@ -119,20 +116,17 @@ export function isAuthorizedForCommand(
  */
 export function isAuthorized(interaction: Interaction): boolean {
     if (!interaction.isChatInputCommand() && !interaction.isAutocomplete()) {
-        // For non-command interactions, just check if they're not unauthorized
-        return getAuthLevel(interaction.user.id) !== AuthLevel.UNAUTHORIZED;
+        // Buttons, select menus, context menus — these belong to commands that
+        // already passed their own check, so let them through.
+        return true;
     }
 
     const commandName = interaction.commandName;
-    
+
     // Try to get subcommand name if it exists
     let subcommandName: string | undefined;
     try {
-        if (interaction.isChatInputCommand()) {
-            subcommandName = interaction.options.getSubcommand(false) || undefined;
-        } else if (interaction.isAutocomplete()) {
-            subcommandName = interaction.options.getSubcommand(false) || undefined;
-        }
+        subcommandName = interaction.options.getSubcommand(false) || undefined;
     } catch {
         // No subcommand exists, that's fine
     }
@@ -151,32 +145,28 @@ export async function sendUnauthorizedResponse(
     if (!interaction.isRepliable()) return;
 
     const authLevel = getAuthLevel(interaction.user.id);
-    
+    const fullSubcommandName = commandName && subcommandName
+        ? `${commandName}:${subcommandName}`
+        : undefined;
+    const label = subcommandName
+        ? `/${commandName} ${subcommandName}`
+        : `/${commandName}`;
+
     let title: string;
     let description: string;
 
-    if (authLevel === AuthLevel.UNAUTHORIZED) {
-        // Completely unauthorized
-        title = '🔒 Unauthorized';
-        description = 'You are not authorized to use this bot.';
-    } else if (authLevel === AuthLevel.FRIEND && commandName) {
-        // Friend trying to use restricted command/subcommand
-        if (subcommandName) {
-            const fullSubcommandName = `${commandName}:${subcommandName}`;
-            if (OWNER_ONLY_SUBCOMMANDS.includes(fullSubcommandName)) {
-                title = '🔒 Owner Only';
-                description = `The \`/${commandName} ${subcommandName}\` command is restricted to the bot owner for security reasons.`;
-            } else {
-                title = '🔒 Owner Only';
-                description = `The \`/${commandName} ${subcommandName}\` command is restricted to the bot owner.`;
-            }
-        } else if (OWNER_ONLY_COMMANDS.includes(commandName)) {
-            title = '🔒 Owner Only';
-            description = `The \`/${commandName}\` command is restricted to the bot owner for security reasons.`;
-        } else {
-            title = '🔒 Unauthorized';
-            description = 'You do not have permission to use this command.';
-        }
+    if (
+        commandName &&
+        (OWNER_ONLY_COMMANDS.includes(commandName) ||
+            (fullSubcommandName && OWNER_ONLY_SUBCOMMANDS.includes(fullSubcommandName)))
+    ) {
+        // Owner-only, whoever is asking
+        title = '🔒 Owner Only';
+        description = `The \`${label}\` command is restricted to the bot owner for security reasons.`;
+    } else if (commandName && authLevel === AuthLevel.PUBLIC && RESTRICTED_COMMANDS.includes(commandName)) {
+        // Public user hitting a friends-only command
+        title = '🔒 Friends Only';
+        description = `The \`${label}\` command is restricted to the bot owner and their friends.`;
     } else {
         // Fallback
         title = '🔒 Unauthorized';

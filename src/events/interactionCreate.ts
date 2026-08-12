@@ -33,6 +33,12 @@ export async function execute(interaction: Interaction) {
             }
         }
 
+        // Autocomplete can't be replied to with an embed — return no options.
+        if (interaction.isAutocomplete()) {
+            await interaction.respond([]);
+            return;
+        }
+
         await sendUnauthorizedResponse(interaction, commandName, subcommandName);
         return;
     }
